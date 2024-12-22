@@ -1,0 +1,5 @@
+{
+  "car_id": "car_01",
+  "anomaly": true,
+  "reconstruction_error": 0.062
+}

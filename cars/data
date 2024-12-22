@@ -1,0 +1,7 @@
+{
+  "car_id": "car_01",
+  "speed": 80,
+  "engine_temp": 90,
+  "speed_diff": 0.1,
+  "temp_normalized": 0.7
+}

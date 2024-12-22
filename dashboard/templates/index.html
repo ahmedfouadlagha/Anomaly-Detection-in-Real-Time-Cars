@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car Anomaly Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.0/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>Car Anomaly Dashboard</h1>
+
+    <div>
+        <h2>Real-Time Car Data</h2>
+        <canvas id="speed-chart" width="400" height="200"></canvas>
+        <canvas id="temp-chart" width="400" height="200"></canvas>
+    </div>
+
+    <div>
+        <h2>Anomalies</h2>
+        <ul id="anomaly-log"></ul>
+    </div>
+
+    <script>
+        const socket = io();
+
+        // Chart.js Configuration
+        const speedChartCtx = document.getElementById('speed-chart').getContext('2d');
+        const tempChartCtx = document.getElementById('temp-chart').getContext('2d');
+
+        const speedChart = new Chart(speedChartCtx, {
+            type: 'line',
+            data: {
+                labels: [], // Timestamps
+                datasets: [{
+                    label: 'Speed (km/h)',
+                    data: [],
+                    borderColor: 'blue',
+                    fill: false,
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { title: { display: true, text: 'Time' } },
+                    y: { title: { display: true, text: 'Speed (km/h)' } }
+                }
+            }
+        });
+
+        const tempChart = new Chart(tempChartCtx, {
+            type: 'line',
+            data: {
+                labels: [], // Timestamps
+                datasets: [{
+                    label: 'Engine Temperature (°C)',
+                    data: [],
+                    borderColor: 'red',
+                    fill: false,
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { title: { display: true, text: 'Time' } },
+                    y: { title: { display: true, text: 'Temperature (°C)' } }
+                }
+            }
+        });
+
+        // Update charts with real-time data
+        socket.on('car_data', (data) => {
+            const now = new Date().toLocaleTimeString();
+
+            // Update Speed Chart
+            if (speedChart.data.labels.length > 10) {
+                speedChart.data.labels.shift();
+                speedChart.data.datasets[0].data.shift();
+            }
+            speedChart.data.labels.push(now);
+            speedChart.data.datasets[0].data.push(data.speed);
+            speedChart.update();
+
+            // Update Temperature Chart
+            if (tempChart.data.labels.length > 10) {
+                tempChart.data.labels.shift();
+                tempChart.data.datasets[0].data.shift();
+            }
+            tempChart.data.labels.push(now);
+            tempChart.data.datasets[0].data.push(data.engine_temp);
+            tempChart.update();
+        });
+
+        // Display anomalies
+        socket.on('anomaly_data', (data) => {
+            const log = document.getElementById('anomaly-log');
+            const entry = document.createElement('li');
+            entry.style.color = 'red';
+            entry.textContent = `🚨 Anomaly detected for ${data.car_id} | Error: ${data.reconstruction_error}`;
+            log.appendChild(entry);
+        });
+    </script>
+</body>
+</html>
