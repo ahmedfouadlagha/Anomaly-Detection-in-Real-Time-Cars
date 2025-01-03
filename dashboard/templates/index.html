@@ -4,16 +4,102 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Car Anomaly Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        h2 {
+            color: #555;
+        }
+        .charts {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+        }
+        canvas {
+            max-width: 400px;
+            margin: 20px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            background-color: #fff;
+        }
+        #summary {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+        }
+        .metric {
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            width: 150px;
+        }
+        #anomaly-log {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #fff;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+        }
+        #anomaly-log li {
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        #anomaly-log li:last-child {
+            border-bottom: none;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+        }
+    </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.0/socket.io.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <h1>Car Anomaly Dashboard</h1>
+    <div class="loading" id="loading">Loading data...</div>
 
-    <div>
-        <h2>Real-Time Car Data</h2>
-        <canvas id="speed-chart" width="400" height="200"></canvas>
-        <canvas id="temp-chart" width="400" height="200"></canvas>
+    <div id="summary">
+        <div class="metric">
+            <h2>Average Speed</h2>
+            <p id="avg-speed">0 km/h</p>
+        </div>
+        <div class="metric">
+            <h2>Max Temp</h2>
+            <p id="max-temp">0 °C</p>
+        </div>
+        <div class="metric">
+            <h2>Total Anomalies</h2>
+            <p id="total-anomalies">0</p>
+        </div>
+    </div>
+
+    <div class="charts">
+        <div>
+            <h2>Speed</h2>
+            <canvas id="speed-chart"></canvas>
+        </div>
+        <div>
+            <h2>Engine Temperature</h2>
+            <canvas id="temp-chart"></canvas>
+        </div>
+        <div>
+            <h2>Fuel Level</h2>
+            <canvas id="fuel-chart"></canvas>
+        </div>
     </div>
 
     <div>
@@ -23,53 +109,34 @@
 
     <script>
         const socket = io();
+        const loadingIndicator = document.getElementById('loading');
 
-        // Chart.js Configuration
+        // Initialize charts
         const speedChartCtx = document.getElementById('speed-chart').getContext('2d');
         const tempChartCtx = document.getElementById('temp-chart').getContext('2d');
+        const fuelChartCtx = document.getElementById('fuel-chart').getContext('2d');
 
         const speedChart = new Chart(speedChartCtx, {
             type: 'line',
-            data: {
-                labels: [], // Timestamps
-                datasets: [{
-                    label: 'Speed (km/h)',
-                    data: [],
-                    borderColor: 'blue',
-                    fill: false,
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    x: { title: { display: true, text: 'Time' } },
-                    y: { title: { display: true, text: 'Speed (km/h)' } }
-                }
-            }
+            data: { labels: [], datasets: [{ label: 'Speed (km/h)', data: [], borderColor: 'blue', fill: false }] },
+            options: { responsive: true }
         });
 
         const tempChart = new Chart(tempChartCtx, {
             type: 'line',
-            data: {
-                labels: [], // Timestamps
-                datasets: [{
-                    label: 'Engine Temperature (°C)',
-                    data: [],
-                    borderColor: 'red',
-                    fill: false,
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    x: { title: { display: true, text: 'Time' } },
-                    y: { title: { display: true, text: 'Temperature (°C)' } }
-                }
-            }
+            data: { labels: [], datasets: [{ label: 'Engine Temperature (°C)', data: [], borderColor: 'red', fill: false }] },
+            options: { responsive: true }
+        });
+
+        const fuelChart = new Chart(fuelChartCtx, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Fuel Level (%)', data: [], borderColor: 'green', fill: false }] },
+            options: { responsive: true }
         });
 
         // Update charts with real-time data
         socket.on('car_data', (data) => {
+            loadingIndicator.style.display = 'none';
             const now = new Date().toLocaleTimeString();
 
             // Update Speed Chart
@@ -89,6 +156,19 @@
             tempChart.data.labels.push(now);
             tempChart.data.datasets[0].data.push(data.engine_temp);
             tempChart.update();
+
+            // Update Fuel Level Chart
+            if (fuelChart.data.labels.length > 10) {
+                fuelChart.data.labels.shift();
+                fuelChart.data.datasets[0].data.shift();
+            }
+            fuelChart.data.labels.push(now);
+            fuelChart.data.datasets[0].data.push(data.fuel_level);
+            fuelChart.update();
+
+            // Update summary metrics
+            document.getElementById('avg-speed').textContent = `${(data.speed).toFixed(2)} km/h`;
+            document.getElementById('max-temp').textContent = `${(data.engine_temp).toFixed(2)} °C`;
         });
 
         // Display anomalies
@@ -96,8 +176,12 @@
             const log = document.getElementById('anomaly-log');
             const entry = document.createElement('li');
             entry.style.color = 'red';
-            entry.textContent = `🚨 Anomaly detected for ${data.car_id} | Error: ${data.reconstruction_error}`;
+            entry.innerHTML = `🚨 Anomaly detected for <strong>${data.car_id}</strong> | Error: <strong>${data.reconstruction_error}</strong>`;
             log.appendChild(entry);
+            log.scrollTop = log.scrollHeight; // Auto-scroll to latest entry
+
+            // Update total anomalies count
+            document.getElementById('total-anomalies').textContent = log.children.length;
         });
     </script>
 </body>
